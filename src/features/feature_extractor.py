@@ -1,12 +1,13 @@
 import os
-import scipy.io.wavfile as audio_reader
+import scipy.io.wavfile as wavfile
 import numpy as np
 from python_speech_features import mfcc
 import pandas as pd
+import gc as gc
 
 
 def get_features(sub_sample, rate):
-    features = mfcc(sub_sample, rate)
+    features = mfcc(sub_sample, rate, winlen=0.1, nfft=2048)
     return features
 
 
@@ -14,23 +15,33 @@ def process_file(filename, classification_class, parent_path="../../data/raw/"):
 
     print("Processing file " + filename)
     # read in file
-    rate, audio_data = audio_reader.read(parent_path +
-                                      classification_class + "/" +
-                                      filename)
-    # discarding first and last 10%
+
+    rate, audio_data = wavfile.read(parent_path + classification_class + "/" + filename)
+    # audio_data, rate = librosa.load(parent_path + classification_class + "/" + filename, sr=16000)
+    # audio_data = librosa.resample(data, rate, 16000)
+
+    # Discarding first and last 10%
     length = np.shape(audio_data)[0]
     mark = int(0.1 * length)
-    audio_data = audio_data[mark:-mark, :]
+    audio_data = audio_data[mark:-mark]
 
-    # Converting audio to mono and getting features
-    audio_data = np.mean(audio_data, axis=1)
-    features = get_features(audio_data, rate)
+    # split huge array data into smaller chunks
+    max_size = 2000
+    result = np.array_split(audio_data, len(audio_data)// max_size)
+    for array_chunk in result:
+        # Getting features
+        features = get_features(array_chunk, rate)
 
-    # Write out to csv file
-    pd.DataFrame(features).to_csv("../../data/processed/" + classification_class + ".csv",
-                                  mode="a",
-                                  header=False,
-                                  index=False)
+        # Write out to csv file
+        pd.DataFrame(features).to_csv("../../data/processed/" + classification_class + ".csv",
+                                      mode="a",
+                                      header=False,
+                                      index=False)
+
+
+
+
+
 
     # Code to batch data and calculate features per batch
     # Not useful as MFCC already is calculated on splits
@@ -54,12 +65,15 @@ def main():
 
     # Processing each directory
     for directory in source_dirs:
-        if directory != 'playlists' and directory != 'talk':
+        dir_list = ['playlists', 'talk', 'ads', 'music']
+        if directory not in dir_list:
             file_list = os.listdir("../../data/raw/" + directory)
             print("Processing samples of class " + directory)
             for filename in file_list:
                 # Here each directory is a class, passing it along with the file
                 process_file(filename, directory)
+        gc.collect()
+
 
 
 if __name__ == "__main__":

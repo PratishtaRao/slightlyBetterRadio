@@ -1,5 +1,7 @@
 import sys
 import subprocess
+from os import listdir
+from os.path import isfile, join
 
 
 def download_audio(links, out_label):
@@ -12,6 +14,21 @@ def download_audio(links, out_label):
 
         # subprocess call to run youtube-dl
         subprocess.run("../../external/youtube-dl " + config_args + " " + output_location + " \"" + link + "\"")
+
+
+def convert_mp3_to_wav(out_label):
+    out = out_label + "_wav"
+    input_location = "../../data/raw/" + out_label
+    output_location = "../../data/raw/" + out
+    onlyfiles = [f for f in listdir(input_location) if isfile(join(input_location, f))]
+
+    for file in onlyfiles:
+        # convert the downloaded mp3 audio to a 16 bit, 16khz mono wav file
+        # TODO: Create the output file first, you created it manually to store the new .wav files
+        cmd = "ffmpeg -i  {input_loc} -acodec pcm_s16le -ac 1 -ar 16000  {output} ".format(input_loc=input_location + "/" + file,
+                                                                                           output=output_location + "/" + file[:-4] + ".wav")
+        # subprocess call to run ffmpeg
+        subprocess.run(cmd)
 
 
 def usage():
@@ -38,9 +55,14 @@ def main():
             links = read_links(filename)
 
             # Extracting file name for output directory location
-            out = filename.split("/")[-1]
+            out = filename.split("\\")[-1]
             download_audio(links, out)
+            convert_mp3_to_wav(out)
+
+def test_mp3_convert():
+    convert_mp3_to_wav("ads")
 
 
 if __name__ == '__main__':
-    main()
+    #main()
+    test_mp3_convert()
